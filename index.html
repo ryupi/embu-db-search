@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>演武DB 検索</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #ffffff;
+    --panel: #f7f7f8;
+    --border: #e3e3e6;
+    --text: #1f2023;
+    --muted: #6b6f76;
+    --accent: #c0392b;
+    --accent-soft: #fbeae8;
+    --header-bg: #2b2d31;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Segoe UI", sans-serif;
+    font-size: 14px;
+  }
+  .wrap { padding: 20px 24px 40px; max-width: 1400px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; font-weight: 700; }
+  .subtitle { color: var(--muted); margin: 0 0 18px; font-size: 13px; }
+
+  .filters {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+    margin-bottom: 14px;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+  .field.grow { flex: 1 1 220px; }
+  .field label { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .field input, .field select {
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .reset-btn {
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+    height: 32px;
+  }
+  .reset-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  .status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .status-row b { color: var(--text); }
+  .refresh-btn {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .refresh-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  .table-scroll {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: auto;
+    max-height: 68vh;
+  }
+  table { border-collapse: collapse; width: 100%; min-width: 980px; }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--header-bg);
+    color: #fff;
+    text-align: left;
+    padding: 9px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    z-index: 1;
+  }
+  thead th:hover { background: #3a3d42; }
+  thead th .arrow { opacity: 0.6; font-size: 10px; margin-left: 3px; }
+  tbody td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    font-size: 12.5px;
+  }
+  tbody tr:hover { background: var(--accent-soft); }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  tbody tr:nth-child(even):hover { background: var(--accent-soft); }
+  td.rank { text-align: center; }
+  td.step { text-align: center; }
+  a.yt-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  a.yt-link:hover { text-decoration: underline; }
+  .empty-cell { color: #c7c8cc; }
+
+  .state-msg {
+    padding: 40px 0;
+    text-align: center;
+    color: var(--muted);
+  }
+  .state-msg.error { color: var(--accent); }
+  footer {
+    margin-top: 18px;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>演武DB 検索</h1>
+  <p class="subtitle">Google スプレッドシート「演武DB」を検索・絞り込みできます。開くたびに最新のデータを読み込みます。</p>
+
+  <div class="filters">
+    <div class="field">
+      <label for="f-bumon">部門</label>
+      <select id="f-bumon"><option value="">すべて</option></select>
+    </div>
+    <div class="field">
+      <label for="f-univ">大学</label>
+      <select id="f-univ"><option value="">すべて</option></select>
+    </div>
+    <div class="field grow">
+      <label for="f-start">構成の始まりの技</label>
+      <select id="f-start"><option value="">すべて</option></select>
+    </div>
+    <div class="field grow">
+      <label for="f-end">構成の終わりの技</label>
+      <select id="f-end"><option value="">すべて</option></select>
+    </div>
+    <button class="reset-btn" id="reset-btn">条件をクリア</button>
+  </div>
+
+  <div class="status-row">
+    <span id="status-text">読み込み中...</span>
+    <span>
+      <span id="updated-text"></span>
+      <button class="refresh-btn" id="refresh-btn" type="button">再読み込み</button>
+    </span>
+  </div>
+
+  <div class="table-scroll">
+    <table id="data-table" style="display:none">
+      <thead>
+        <tr>
+          <th data-key="大会名">大会名</th>
+          <th data-key="順位">順位</th>
+          <th data-key="部門名">部門名</th>
+          <th data-key="大学名">大学名</th>
+          <th data-key="組名">組名</th>
+          <th data-key="構成番号">構成</th>
+          <th data-key="構成の始まりの技">始まりの技</th>
+          <th data-key="構成の終わりの技">終わりの技</th>
+          <th data-key="__yt">動画</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+    <div id="state-msg" class="state-msg">読み込み中...</div>
+  </div>
+
+  <footer>演武DB検索アプリ</footer>
+</div>
+
+<script>
+const SHEET_ID = "1nbb5p-XSvTIaYFIddlcIRjukZ4T0Jia8I7zeCQBb6qw";
+const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+
+let allRows = [];
+let sortKey = null;
+let sortDir = 1;
+
+// Minimal RFC4180-ish CSV parser (handles quoted fields, embedded commas/newlines/escaped quotes).
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+  const s = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (s[i + 1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"') {
+        inQuotes = true;
+      } else if (c === ",") {
+        row.push(field); field = "";
+      } else if (c === "\n") {
+        row.push(field); field = "";
+        rows.push(row); row = [];
+      } else {
+        field += c;
+      }
+    }
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows.filter(r => !(r.length === 1 && r[0] === ""));
+}
+
+function parseSheetCsv(text) {
+  const table = parseCsv(text);
+  if (table.length === 0) return [];
+  const headers = table[0];
+  const rows = [];
+  for (let i = 1; i < table.length; i++) {
+    const cells = table[i];
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = cells[idx] !== undefined ? cells[idx] : ""; });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function populateSelect(selectEl, values) {
+  const prev = selectEl.value;
+  selectEl.innerHTML = '<option value="">すべて</option>';
+  const counts = new Map();
+  values.forEach(v => {
+    if (!v || v.trim() === "") return;
+    counts.set(v, (counts.get(v) || 0) + 1);
+  });
+  const sorted = Array.from(counts.entries()).sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1];
+    return a[0].localeCompare(b[0], "ja");
+  });
+  sorted.forEach(([v, count]) => {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = `${v} (${count})`;
+    selectEl.appendChild(opt);
+  });
+  if (Array.from(selectEl.options).some(o => o.value === prev)) selectEl.value = prev;
+}
+
+function getFilters() {
+  return {
+    startTech: document.getElementById("f-start").value,
+    endTech: document.getElementById("f-end").value,
+    bumon: document.getElementById("f-bumon").value,
+    univ: document.getElementById("f-univ").value,
+  };
+}
+
+function rowMatches(row, f) {
+  if (f.bumon && row["部門名"] !== f.bumon) return false;
+  if (f.univ && row["大学名"] !== f.univ) return false;
+  if (f.startTech && row["構成の始まりの技"] !== f.startTech) return false;
+  if (f.endTech && row["構成の終わりの技"] !== f.endTech) return false;
+  return true;
+}
+
+function render() {
+  const f = getFilters();
+  let rows = allRows.filter(r => rowMatches(r, f));
+
+  if (sortKey) {
+    rows = rows.slice().sort((a, b) => {
+      let av = sortKey === "__yt" ? (a["YouTubeリンク"] || "") : (a[sortKey] || "");
+      let bv = sortKey === "__yt" ? (b["YouTubeリンク"] || "") : (b[sortKey] || "");
+      if (sortKey === "構成番号") {
+        av = parseInt(av) || 0; bv = parseInt(bv) || 0;
+        return (av - bv) * sortDir;
+      }
+      return av.toString().localeCompare(bv.toString(), "ja") * sortDir;
+    });
+  }
+
+  const performanceCount = new Set(rows.map(r => r["演武ID"])).size;
+  document.getElementById("status-text").innerHTML =
+    `<b>${rows.length}</b> 件表示中（<b>${performanceCount}</b> 演武 / 全 ${allRows.length} 件中）`;
+
+  const tbody = document.getElementById("table-body");
+  tbody.innerHTML = "";
+  const frag = document.createDocumentFragment();
+
+  rows.forEach(row => {
+    const tr = document.createElement("tr");
+
+    const cells = [
+      row["大会名"], row["順位"], row["部門名"],
+      row["大学名"], row["組名"], row["構成番号"],
+      row["構成の始まりの技"], row["構成の終わりの技"]
+    ];
+    cells.forEach((val, idx) => {
+      const td = document.createElement("td");
+      if (idx === 1) td.className = "rank";
+      if (idx === 5) td.className = "step";
+      if (val && val.trim() !== "") {
+        td.textContent = val;
+      } else {
+        td.textContent = "—";
+        td.className += " empty-cell";
+      }
+      tr.appendChild(td);
+    });
+
+    const ytTd = document.createElement("td");
+    const url = row["YouTubeリンク"];
+    if (url) {
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.className = "yt-link";
+      a.textContent = "▶ 視聴";
+      ytTd.appendChild(a);
+    } else {
+      ytTd.textContent = "—";
+      ytTd.className = "empty-cell";
+    }
+    tr.appendChild(ytTd);
+
+    frag.appendChild(tr);
+  });
+  tbody.appendChild(frag);
+
+  document.getElementById("data-table").style.display = rows.length ? "" : "none";
+  const stateMsg = document.getElementById("state-msg");
+  if (rows.length === 0) {
+    stateMsg.style.display = "";
+    stateMsg.textContent = "条件に一致するデータがありません。";
+    stateMsg.className = "state-msg";
+  } else {
+    stateMsg.style.display = "none";
+  }
+}
+
+function setupSorting() {
+  document.querySelectorAll("thead th").forEach(th => {
+    th.addEventListener("click", () => {
+      const key = th.getAttribute("data-key");
+      if (sortKey === key) {
+        sortDir *= -1;
+      } else {
+        sortKey = key;
+        sortDir = 1;
+      }
+      document.querySelectorAll("thead th .arrow").forEach(a => a.remove());
+      const arrow = document.createElement("span");
+      arrow.className = "arrow";
+      arrow.textContent = sortDir === 1 ? "▲" : "▼";
+      th.appendChild(arrow);
+      render();
+    });
+  });
+}
+
+let filterEventsBound = false;
+function setupFilterEvents() {
+  if (filterEventsBound) return;
+  filterEventsBound = true;
+  ["f-start", "f-end", "f-bumon", "f-univ"].forEach(id => {
+    document.getElementById(id).addEventListener("input", render);
+  });
+  document.getElementById("reset-btn").addEventListener("click", () => {
+    document.getElementById("f-start").value = "";
+    document.getElementById("f-end").value = "";
+    document.getElementById("f-bumon").value = "";
+    document.getElementById("f-univ").value = "";
+    render();
+  });
+  document.getElementById("refresh-btn").addEventListener("click", load);
+}
+
+async function load() {
+  const stateMsg = document.getElementById("state-msg");
+  const statusText = document.getElementById("status-text");
+  statusText.textContent = "読み込み中...";
+  try {
+    const res = await fetch(CSV_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const csvText = await res.text();
+    allRows = parseSheetCsv(csvText).filter(r => r["演武ID"] && r["演武ID"].trim() !== "");
+
+    populateSelect(document.getElementById("f-bumon"), allRows.map(r => r["部門名"]));
+    populateSelect(document.getElementById("f-univ"), allRows.map(r => r["大学名"]));
+    populateSelect(document.getElementById("f-start"), allRows.map(r => r["構成の始まりの技"]));
+    populateSelect(document.getElementById("f-end"), allRows.map(r => r["構成の終わりの技"]));
+
+    setupSorting();
+    setupFilterEvents();
+    document.getElementById("updated-text").textContent =
+      "最終読み込み: " + new Date().toLocaleString("ja-JP");
+
+    render();
+  } catch (err) {
+    stateMsg.className = "state-msg error";
+    stateMsg.style.display = "";
+    stateMsg.textContent = "データの読み込みに失敗しました: " + (err && err.message ? err.message : err);
+    statusText.textContent = "読み込みエラー";
+  }
+}
+
+load();
+</script>
+</body>
+</html>
