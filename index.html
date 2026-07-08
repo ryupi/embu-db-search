@@ -63,6 +63,18 @@
     height: 32px;
   }
   .reset-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .search-btn {
+    padding: 7px 18px;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    height: 32px;
+  }
+  .search-btn:hover { background: #a8331f; border-color: #a8331f; }
 
   .status-row {
     display: flex;
@@ -162,6 +174,7 @@
       <label for="f-end">構成の終わりの技</label>
       <select id="f-end"><option value="">すべて</option></select>
     </div>
+    <button class="search-btn" id="search-btn" type="button">検索</button>
     <button class="reset-btn" id="reset-btn">条件をクリア</button>
   </div>
 
@@ -219,6 +232,7 @@ function showRandomSubtitle() {
 let allRows = [];
 let sortKey = null;
 let sortDir = 1;
+let hasSearched = false;
 
 // Minimal RFC4180-ish CSV parser (handles quoted fields, embedded commas/newlines/escaped quotes).
 function parseCsv(text) {
@@ -306,6 +320,20 @@ function rowMatches(row, f) {
 }
 
 function render() {
+  const tbody0 = document.getElementById("table-body");
+  const stateMsg0 = document.getElementById("state-msg");
+
+  if (!hasSearched) {
+    document.getElementById("data-table").style.display = "none";
+    tbody0.innerHTML = "";
+    stateMsg0.style.display = "";
+    stateMsg0.className = "state-msg";
+    stateMsg0.textContent = "条件を選んで「検索」を押してください。";
+    document.getElementById("status-text").innerHTML =
+      `条件を指定して検索してください（全 ${allRows.length} 件）`;
+    return;
+  }
+
   const f = getFilters();
   let rows = allRows.filter(r => rowMatches(r, f));
 
@@ -405,14 +433,24 @@ let filterEventsBound = false;
 function setupFilterEvents() {
   if (filterEventsBound) return;
   filterEventsBound = true;
+  document.getElementById("search-btn").addEventListener("click", () => {
+    hasSearched = true;
+    render();
+  });
   ["f-start", "f-end", "f-bumon", "f-univ"].forEach(id => {
-    document.getElementById(id).addEventListener("input", render);
+    document.getElementById(id).addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        hasSearched = true;
+        render();
+      }
+    });
   });
   document.getElementById("reset-btn").addEventListener("click", () => {
     document.getElementById("f-start").value = "";
     document.getElementById("f-end").value = "";
     document.getElementById("f-bumon").value = "";
     document.getElementById("f-univ").value = "";
+    hasSearched = false;
     render();
   });
   document.getElementById("refresh-btn").addEventListener("click", load);
