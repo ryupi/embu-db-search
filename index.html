@@ -143,7 +143,7 @@
 <body>
 <div class="wrap">
   <h1>演武DB 検索</h1>
-  <p class="subtitle">Google スプレッドシート「演武DB」を検索・絞り込みできます。開くたびに最新のデータを読み込みます。</p>
+  <p class="subtitle" id="subtitle"></p>
 
   <div class="filters">
     <div class="field">
@@ -199,6 +199,22 @@
 <script>
 const SHEET_ID = "1nbb5p-XSvTIaYFIddlcIRjukZ4T0Jia8I7zeCQBb6qw";
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+
+// サブタイトルに表示するメッセージ一覧。開くたびにランダムで1つ表示される。
+// 追加・削除は自由にこの配列を編集するだけでOK。
+const SUBTITLE_MESSAGES = [
+  "力愛不ニ",
+  "単体柔法は”単体”と入れてね！",
+  "動画研究は上達への一歩",
+  "拳善一如",
+];
+
+function showRandomSubtitle() {
+  const el = document.getElementById("subtitle");
+  if (!el || SUBTITLE_MESSAGES.length === 0) return;
+  const msg = SUBTITLE_MESSAGES[Math.floor(Math.random() * SUBTITLE_MESSAGES.length)];
+  el.textContent = msg;
+}
 
 let allRows = [];
 let sortKey = null;
@@ -431,6 +447,7 @@ async function load() {
   }
 }
 
+showRandomSubtitle();
 load();
 </script>
 </body>
