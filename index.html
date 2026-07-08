@@ -206,12 +206,27 @@
     <div id="state-msg" class="state-msg">読み込み中...</div>
   </div>
 
-  <footer>演武DB検索アプリ</footer>
+  <footer>演武DB検索アプリ　<span id="visit-count"></span></footer>
 </div>
 
 <script>
 const SHEET_ID = "1nbb5p-XSvTIaYFIddlcIRjukZ4T0Jia8I7zeCQBb6qw";
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+const COUNTER_URL = "https://api.counterapi.dev/v1/embu-db-search/pageviews/up";
+
+async function bumpVisitCounter() {
+  const el = document.getElementById("visit-count");
+  try {
+    const res = await fetch(COUNTER_URL);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (el && typeof data.count === "number") {
+      el.textContent = `／累計閲覧数: ${data.count}回`;
+    }
+  } catch (e) {
+    // カウンターの取得に失敗してもアプリ本体には影響させない
+  }
+}
 
 // サブタイトルに表示するメッセージ一覧。開くたびにランダムで1つ表示される。
 // 追加・削除は自由にこの配列を編集するだけでOK。
@@ -487,6 +502,7 @@ async function load() {
 
 showRandomSubtitle();
 load();
+bumpVisitCounter();
 </script>
 </body>
 </html>
