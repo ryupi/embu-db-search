@@ -213,14 +213,18 @@
 const SHEET_ID = "1nbb5p-XSvTIaYFIddlcIRjukZ4T0Jia8I7zeCQBb6qw";
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
 const COUNTER_URL = "https://api.counterapi.dev/v1/embu-db-search/pageviews/up";
+// URLに ?admin=ryuu を付けて開いた時だけ閲覧数を表示する（それ以外の人には見えない）
+const OWNER_KEY = "admin";
+const OWNER_VALUE = "ryuu";
 
 async function bumpVisitCounter() {
+  const isOwner = new URLSearchParams(location.search).get(OWNER_KEY) === OWNER_VALUE;
   const el = document.getElementById("visit-count");
   try {
     const res = await fetch(COUNTER_URL);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    if (el && typeof data.count === "number") {
+    if (el && isOwner && typeof data.count === "number") {
       el.textContent = `／累計閲覧数: ${data.count}回`;
     }
   } catch (e) {
