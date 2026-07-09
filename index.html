@@ -173,6 +173,57 @@
     color: var(--muted);
     text-align: center;
   }
+
+  /* スマホ向け：表をカード形式に切り替え */
+  @media (max-width: 700px) {
+    .wrap { padding: 14px 12px 28px; }
+    h1 { font-size: 18px; }
+    .filters { padding: 12px; gap: 10px; }
+    .field { min-width: 0; flex: 1 1 100%; }
+    .field.grow { flex: 1 1 100%; }
+    .search-btn, .reset-btn { flex: 1 1 48%; text-align: center; }
+    .status-row { flex-wrap: wrap; gap: 6px; }
+
+    .table-scroll { border: none; max-height: none; overflow: visible; }
+    table { min-width: 0; width: 100%; }
+    thead {
+      position: absolute;
+      width: 1px; height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0; padding: 0; margin: -1px;
+    }
+    tbody { display: block; }
+    tbody tr {
+      display: block;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      padding: 4px 12px;
+      background: #fff;
+    }
+    tbody tr:nth-child(even) { background: #fff; }
+    tbody td {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 7px 0;
+      border-bottom: 1px dashed var(--border);
+      white-space: normal;
+      text-align: right;
+    }
+    tbody td:last-child { border-bottom: none; }
+    tbody td::before {
+      content: attr(data-label);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-align: left;
+      flex-shrink: 0;
+    }
+  }
 </style>
 </head>
 <body>
@@ -428,8 +479,10 @@ function render() {
       row["大学名"], row["組名"], row["構成番号"],
       row["構成の始まりの技"], row["構成の終わりの技"]
     ];
+    const cellLabels = ["大会名", "順位", "部門名", "大学名", "組名", "構成", "始まりの技", "終わりの技"];
     cells.forEach((val, idx) => {
       const td = document.createElement("td");
+      td.setAttribute("data-label", cellLabels[idx]);
       if (idx === 1) td.className = "rank";
       if (idx === 5) td.className = "step";
       if (val && val.trim() !== "") {
@@ -442,6 +495,7 @@ function render() {
     });
 
     const ytTd = document.createElement("td");
+    ytTd.setAttribute("data-label", "動画");
     const url = row["YouTubeリンク"];
     if (url) {
       const a = document.createElement("a");
