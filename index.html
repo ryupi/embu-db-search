@@ -348,6 +348,12 @@ function populateSelect(selectEl, values) {
   if (Array.from(selectEl.options).some(o => o.value === prev)) selectEl.value = prev;
 }
 
+function updateEndOptions() {
+  const startVal = document.getElementById("f-start").value;
+  const rowsForEnd = startVal ? allRows.filter(r => r["構成の始まりの技"] === startVal) : allRows;
+  populateSelect(document.getElementById("f-end"), rowsForEnd.map(r => r["構成の終わりの技"]));
+}
+
 function getFilters() {
   return {
     startTech: document.getElementById("f-start").value,
@@ -483,6 +489,9 @@ function setupFilterEvents() {
     hasSearched = true;
     render();
   });
+  document.getElementById("f-start").addEventListener("change", () => {
+    updateEndOptions();
+  });
   ["f-start", "f-end", "f-bumon", "f-univ"].forEach(id => {
     document.getElementById(id).addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -493,9 +502,9 @@ function setupFilterEvents() {
   });
   document.getElementById("reset-btn").addEventListener("click", () => {
     document.getElementById("f-start").value = "";
-    document.getElementById("f-end").value = "";
     document.getElementById("f-bumon").value = "";
     document.getElementById("f-univ").value = "";
+    updateEndOptions();
     hasSearched = false;
     render();
   });
@@ -515,7 +524,7 @@ async function load() {
     populateSelect(document.getElementById("f-bumon"), allRows.map(r => r["部門名"]));
     populateSelect(document.getElementById("f-univ"), allRows.map(r => r["大学名"]));
     populateSelect(document.getElementById("f-start"), allRows.map(r => r["構成の始まりの技"]));
-    populateSelect(document.getElementById("f-end"), allRows.map(r => r["構成の終わりの技"]));
+    updateEndOptions();
 
     setupSorting();
     setupFilterEvents();
