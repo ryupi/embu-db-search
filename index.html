@@ -348,15 +348,6 @@ function populateSelect(selectEl, values) {
   if (Array.from(selectEl.options).some(o => o.value === prev)) selectEl.value = prev;
 }
 
-function updateLinkedOptions() {
-  const startVal = document.getElementById("f-start").value;
-  const endVal = document.getElementById("f-end").value;
-  const rowsForEnd = startVal ? allRows.filter(r => r["構成の始まりの技"] === startVal) : allRows;
-  populateSelect(document.getElementById("f-end"), rowsForEnd.map(r => r["構成の終わりの技"]));
-  const rowsForStart = endVal ? allRows.filter(r => r["構成の終わりの技"] === endVal) : allRows;
-  populateSelect(document.getElementById("f-start"), rowsForStart.map(r => r["構成の始まりの技"]));
-}
-
 function getFilters() {
   return {
     startTech: document.getElementById("f-start").value,
@@ -366,12 +357,29 @@ function getFilters() {
   };
 }
 
-function rowMatches(row, f) {
-  if (f.bumon && row["部門名"] !== f.bumon) return false;
-  if (f.univ && row["大学名"] !== f.univ) return false;
-  if (f.startTech && row["構成の始まりの技"] !== f.startTech) return false;
-  if (f.endTech && row["構成の終わりの技"] !== f.endTech) return false;
+function rowMatches(row, f, excludeKey) {
+  if (excludeKey !== "bumon" && f.bumon && row["部門名"] !== f.bumon) return false;
+  if (excludeKey !== "univ" && f.univ && row["大学名"] !== f.univ) return false;
+  if (excludeKey !== "startTech" && f.startTech && row["構成の始まりの技"] !== f.startTech) return false;
+  if (excludeKey !== "endTech" && f.endTech && row["構成の終わりの技"] !== f.endTech) return false;
   return true;
+}
+
+// 各フィルターの選択肢を、他のフィルターで選ばれている条件と実際に組み合わさっているものだけに絞る（相互絞り込み）
+function updateLinkedOptions() {
+  const f = getFilters();
+
+  const rowsForStart = allRows.filter(r => rowMatches(r, f, "startTech"));
+  populateSelect(document.getElementById("f-start"), rowsForStart.map(r => r["構成の始まりの技"]));
+
+  const rowsForEnd = allRows.filter(r => rowMatches(r, f, "endTech"));
+  populateSelect(document.getElementById("f-end"), rowsForEnd.map(r => r["構成の終わりの技"]));
+
+  const rowsForBumon = allRows.filter(r => rowMatches(r, f, "bumon"));
+  populateSelect(document.getElementById("f-bumon"), rowsForBumon.map(r => r["部門名"]));
+
+  const rowsForUniv = allRows.filter(r => rowMatches(r, f, "univ"));
+  populateSelect(document.getElementById("f-univ"), rowsForUniv.map(r => r["大学名"]));
 }
 
 function render() {
@@ -492,11 +500,10 @@ function setupFilterEvents() {
     hasSearched = true;
     render();
   });
-  document.getElementById("f-start").addEventListener("change", () => {
-    updateLinkedOptions();
-  });
-  document.getElementById("f-end").addEventListener("change", () => {
-    updateLinkedOptions();
+  ["f-start", "f-end", "f-bumon", "f-univ"].forEach(id => {
+    document.getElementById(id).addEventListener("change", () => {
+      updateLinkedOptions();
+    });
   });
   ["f-start", "f-end", "f-bumon", "f-univ"].forEach(id => {
     document.getElementById(id).addEventListener("keydown", (e) => {
@@ -528,10 +535,7 @@ async function load() {
     const csvText = await res.text();
     allRows = parseSheetCsv(csvText).filter(r => r["演武ID"] && r["演武ID"].trim() !== "");
 
-    populateSelect(document.getElementById("f-bumon"), allRows.map(r => r["部門名"]));
-    populateSelect(document.getElementById("f-univ"), allRows.map(r => r["大学名"]));
-    populateSelect(document.getElementById("f-start"), allRows.map(r => r["構成の始まりの技"]));
-    populateSelect(document.getElementById("f-end"), allRows.map(r => r["構成の終わりの技"]));
+    updateLinkedOptions();
 
     setupSorting();
     setupFilterEvents();
