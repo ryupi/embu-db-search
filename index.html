@@ -12,9 +12,12 @@
     --border: #e3e3e6;
     --text: #1f2023;
     --muted: #6b6f76;
-    --accent: #c0392b;
-    --accent-soft: #fbeae8;
-    --header-bg: #2b2d31;
+    /* 慶應義塾 公式ブランドカラー（VIガイドライン準拠） */
+    --accent: #C63527;      /* 慶應レッド */
+    --accent-dark: #9c2a1e;
+    --accent-soft: #fbe9e6;
+    --header-bg: #001E62;   /* 慶應ブルー */
+    --gold: #F1C400;        /* 慶應イエロー（アクセント用） */
   }
   * { box-sizing: border-box; }
   body {
@@ -24,8 +27,28 @@
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Segoe UI", sans-serif;
     font-size: 14px;
   }
+  .tricolor-bar {
+    height: 5px;
+    background: linear-gradient(to right, var(--header-bg) 0 42%, var(--accent) 42% 58%, var(--header-bg) 58% 100%);
+  }
   .wrap { padding: 20px 24px 40px; max-width: 1400px; margin: 0 auto; }
-  h1 { font-size: 20px; margin: 0 0 4px; font-weight: 700; }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+    font-weight: 700;
+    color: var(--header-bg);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h1::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
   .subtitle { color: var(--muted); margin: 0 0 18px; font-size: 13px; }
 
   .filters {
@@ -74,7 +97,7 @@
     font-weight: 600;
     height: 32px;
   }
-  .search-btn:hover { background: #a8331f; border-color: #a8331f; }
+  .search-btn:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
 
   .status-row {
     display: flex;
@@ -153,6 +176,7 @@
 </style>
 </head>
 <body>
+<div class="tricolor-bar"></div>
 <div class="wrap">
   <h1>演武DB 検索</h1>
   <p class="subtitle" id="subtitle"></p>
