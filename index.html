@@ -587,7 +587,16 @@ async function load() {
     const res = await fetch(CSV_URL, { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const csvText = await res.text();
-    allRows = parseSheetCsv(csvText).filter(r => r["演武ID"] && r["演武ID"].trim() !== "");
+    const parsedRows = parseSheetCsv(csvText);
+    // スプレッドシート1列目の見出し名が「演武ID」以外（空欄含む）でも、
+    // 常に先頭列を演武IDとして扱うことで見出しセルの変更に強くする
+    parsedRows.forEach(r => {
+      if (!("演武ID" in r)) {
+        const firstKey = Object.keys(r)[0];
+        r["演武ID"] = r[firstKey];
+      }
+    });
+    allRows = parsedRows.filter(r => r["演武ID"] && r["演武ID"].trim() !== "");
 
     updateLinkedOptions();
 
