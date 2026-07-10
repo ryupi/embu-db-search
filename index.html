@@ -309,8 +309,8 @@ async function bumpVisitCounter() {
   const el = document.getElementById("visit-count");
   const today = dateStr(new Date());
   const results = await Promise.allSettled([
-    fetch(COUNTER_URL),
-    fetch(dailyCounterUrl(today, true)),
+    fetch(COUNTER_URL, { cache: "no-store" }),
+    fetch(dailyCounterUrl(today, true), { cache: "no-store" }),
   ]);
   try {
     const totalRes = results[0];
@@ -338,7 +338,7 @@ async function loadVisitGraph() {
   }
   const counts = await Promise.all(days.map(async (ds) => {
     try {
-      const res = await fetch(dailyCounterUrl(ds, false));
+      const res = await fetch(dailyCounterUrl(ds, false), { cache: "no-store" });
       if (!res.ok) return 0;
       const data = await res.json();
       return typeof data.count === "number" ? data.count : 0;
