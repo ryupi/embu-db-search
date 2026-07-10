@@ -412,14 +412,21 @@ const BUMON_ORDER = [
   "大学生女子",
 ];
 
-function populateSelect(selectEl, values, orderList) {
+// 構成の始まり／終わりの技が空欄の行を選べるようにするための特別な値
+const BLANK_SENTINEL = "__blank__";
+
+function populateSelect(selectEl, values, orderList, includeBlankAsOther) {
   const prev = selectEl.value;
   selectEl.innerHTML = '<option value="">すべて</option>';
   const counts = new Map();
+  let blankCount = 0;
   values.forEach(v => {
-    if (!v || v.trim() === "") return;
+    if (!v || v.trim() === "") { blankCount++; return; }
     counts.set(v, (counts.get(v) || 0) + 1);
   });
+  if (includeBlankAsOther && blankCount > 0) {
+    counts.set(BLANK_SENTINEL, blankCount);
+  }
   let sorted;
   if (orderList) {
     sorted = Array.from(counts.entries()).sort((a, b) => {
@@ -440,7 +447,7 @@ function populateSelect(selectEl, values, orderList) {
   sorted.forEach(([v, count]) => {
     const opt = document.createElement("option");
     opt.value = v;
-    opt.textContent = `${v} (${count})`;
+    opt.textContent = v === BLANK_SENTINEL ? `その他（空欄） (${count})` : `${v} (${count})`;
     selectEl.appendChild(opt);
   });
   if (Array.from(selectEl.options).some(o => o.value === prev)) selectEl.value = prev;
@@ -455,11 +462,17 @@ function getFilters() {
   };
 }
 
+function fieldMatches(val, filterVal) {
+  if (!filterVal) return true;
+  if (filterVal === BLANK_SENTINEL) return !val || val.trim() === "";
+  return val === filterVal;
+}
+
 function rowMatches(row, f, excludeKey) {
   if (excludeKey !== "bumon" && f.bumon && row["部門名"] !== f.bumon) return false;
   if (excludeKey !== "univ" && f.univ && row["大学名"] !== f.univ) return false;
-  if (excludeKey !== "startTech" && f.startTech && row["構成の始まりの技"] !== f.startTech) return false;
-  if (excludeKey !== "endTech" && f.endTech && row["構成の終わりの技"] !== f.endTech) return false;
+  if (excludeKey !== "startTech" && !fieldMatches(row["構成の始まりの技"], f.startTech)) return false;
+  if (excludeKey !== "endTech" && !fieldMatches(row["構成の終わりの技"], f.endTech)) return false;
   return true;
 }
 
@@ -468,10 +481,10 @@ function updateLinkedOptions() {
   const f = getFilters();
 
   const rowsForStart = allRows.filter(r => rowMatches(r, f, "startTech"));
-  populateSelect(document.getElementById("f-start"), rowsForStart.map(r => r["構成の始まりの技"]));
+  populateSelect(document.getElementById("f-start"), rowsForStart.map(r => r["構成の始まりの技"]), null, true);
 
   const rowsForEnd = allRows.filter(r => rowMatches(r, f, "endTech"));
-  populateSelect(document.getElementById("f-end"), rowsForEnd.map(r => r["構成の終わりの技"]));
+  populateSelect(document.getElementById("f-end"), rowsForEnd.map(r => r["構成の終わりの技"]), null, true);
 
   const rowsForBumon = allRows.filter(r => rowMatches(r, f, "bumon"));
   populateSelect(document.getElementById("f-bumon"), rowsForBumon.map(r => r["部門名"]), BUMON_ORDER);
