@@ -281,30 +281,93 @@
     <div id="state-msg" class="state-msg">読み込み中...</div>
   </div>
 
-  <footer>演武DB検索アプリ　<span id="visit-count"></span></footer>
+  <footer>
+    演武DB検索アプリ　<span id="visit-count"></span>
+    <div id="visit-graph"></div>
+  </footer>
 </div>
 
 <script>
 const SHEET_ID = "1nbb5p-XSvTIaYFIddlcIRjukZ4T0Jia8I7zeCQBb6qw";
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
-const COUNTER_URL = "https://api.counterapi.dev/v1/embu-db-search/pageviews/up";
-// URLに ?admin=ryuu を付けて開いた時だけ閲覧数を表示する（それ以外の人には見えない）
+const COUNTER_NAMESPACE = "embu-db-search";
+const COUNTER_NAME = "pageviews";
+const COUNTER_URL = `https://api.counterapi.dev/v1/${COUNTER_NAMESPACE}/${COUNTER_NAME}/up`;
+const DAILY_GRAPH_DAYS = 14;
+// URLに ?admin=ryuu を付けて開いた時だけ閲覧数・グラフを表示する（それ以外の人には見えない）
 const OWNER_KEY = "admin";
 const OWNER_VALUE = "ryuu";
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+function dateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function dailyCounterUrl(ds, increment) {
+  return `https://api.counterapi.dev/v1/${COUNTER_NAMESPACE}/${COUNTER_NAME}-${ds}${increment ? "/up" : ""}`;
+}
 
 async function bumpVisitCounter() {
   const isOwner = new URLSearchParams(location.search).get(OWNER_KEY) === OWNER_VALUE;
   const el = document.getElementById("visit-count");
+  const today = dateStr(new Date());
+  const results = await Promise.allSettled([
+    fetch(COUNTER_URL),
+    fetch(dailyCounterUrl(today, true)),
+  ]);
   try {
-    const res = await fetch(COUNTER_URL);
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    if (el && isOwner && typeof data.count === "number") {
-      el.textContent = `／累計閲覧数: ${data.count}回`;
+    const totalRes = results[0];
+    if (totalRes.status === "fulfilled" && totalRes.value.ok) {
+      const data = await totalRes.value.json();
+      if (el && isOwner && typeof data.count === "number") {
+        el.textContent = `／累計閲覧数: ${data.count}回`;
+      }
     }
   } catch (e) {
     // カウンターの取得に失敗してもアプリ本体には影響させない
   }
+  if (isOwner) loadVisitGraph();
+}
+
+async function loadVisitGraph() {
+  const container = document.getElementById("visit-graph");
+  if (!container) return;
+  const days = [];
+  const today = new Date();
+  for (let i = DAILY_GRAPH_DAYS - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    days.push(dateStr(d));
+  }
+  const counts = await Promise.all(days.map(async (ds) => {
+    try {
+      const res = await fetch(dailyCounterUrl(ds, false));
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return typeof data.count === "number" ? data.count : 0;
+    } catch (e) {
+      return 0;
+    }
+  }));
+  renderVisitGraph(container, days, counts);
+}
+
+function renderVisitGraph(container, days, counts) {
+  const max = Math.max(1, ...counts);
+  const w = 360, h = 64, gap = 2;
+  const barW = (w / days.length) - gap;
+  let bars = "";
+  days.forEach((ds, i) => {
+    const barH = counts[i] > 0 ? Math.max(2, (counts[i] / max) * (h - 16)) : 0;
+    const x = i * (barW + gap);
+    const y = h - barH - 14;
+    bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" fill="#001E62" rx="1"><title>${ds}: ${counts[i]}回</title></rect>`;
+  });
+  const firstLabel = days[0].slice(5);
+  const lastLabel = days[days.length - 1].slice(5);
+  container.innerHTML =
+    `<div style="margin-top:6px;">` +
+    `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" style="max-width:360px;">${bars}</svg>` +
+    `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);max-width:360px;margin:0 auto;">` +
+    `<span>${firstLabel}</span><span>直近${days.length}日間の閲覧数</span><span>${lastLabel}</span>` +
+    `</div></div>`;
 }
 
 // サブタイトルに表示するメッセージ一覧。開くたびにランダムで1つ表示される。
