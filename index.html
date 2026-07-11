@@ -173,6 +173,87 @@
     color: var(--muted);
     text-align: center;
   }
+  .report-link {
+    background: none;
+    border: none;
+    color: var(--muted);
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0;
+  }
+  .report-link:hover { color: var(--accent); }
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  }
+  .modal-box h2 {
+    font-size: 15px;
+    margin: 0 0 10px;
+    color: var(--header-bg);
+  }
+  .modal-box p.hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  .modal-box textarea {
+    width: 100%;
+    min-height: 100px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+  }
+  .modal-box textarea:focus { border-color: var(--accent); }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .modal-cancel-btn {
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .modal-submit-btn {
+    padding: 7px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .modal-submit-btn:disabled { opacity: 0.6; cursor: default; }
+  .modal-msg { font-size: 12px; margin-top: 8px; }
+  .modal-msg.ok { color: #2a7a2a; }
+  .modal-msg.err { color: var(--accent); }
 
   /* スマホ向け：表をカード形式に切り替え */
   @media (max-width: 700px) {
@@ -283,8 +364,22 @@
 
   <footer>
     演武DB検索アプリ　<span id="visit-count"></span>
+    <div><button class="report-link" id="report-open-btn" type="button">間違いなどを報告する</button></div>
     <div id="visit-graph"></div>
   </footer>
+</div>
+
+<div class="modal-overlay" id="report-modal">
+  <div class="modal-box">
+    <h2>間違いなどの報告</h2>
+    <p class="hint">データの誤りや不具合など、気づいたことを自由に書いてください。内容は管理者にのみ届きます。</p>
+    <textarea id="report-text" placeholder="例：E123の構成4の技名が違う気がします"></textarea>
+    <div class="modal-actions">
+      <button class="modal-cancel-btn" id="report-cancel-btn" type="button">閉じる</button>
+      <button class="modal-submit-btn" id="report-submit-btn" type="button">送信</button>
+    </div>
+    <div class="modal-msg" id="report-msg"></div>
+  </div>
 </div>
 
 <script>
@@ -298,6 +393,9 @@ const VISIT_HISTORY_MAX = 60;
 // URLに ?admin=ryuu を付けて開いた時だけ閲覧数・グラフを表示する（それ以外の人には見えない）
 const OWNER_KEY = "admin";
 const OWNER_VALUE = "ryuu";
+// 「間違いなどを報告する」フォームの送信先（Formspree）。届いた内容は管理者のメール／ダッシュボードにのみ表示され、
+// サイト上の他の利用者には一切見えない。
+const REPORT_FORM_URL = "https://formspree.io/f/xzdlnlnk";
 
 function pad2(n) { return String(n).padStart(2, "0"); }
 function dateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
@@ -748,9 +846,75 @@ async function load() {
   }
 }
 
+function setupReportModal() {
+  const overlay = document.getElementById("report-modal");
+  const openBtn = document.getElementById("report-open-btn");
+  const cancelBtn = document.getElementById("report-cancel-btn");
+  const submitBtn = document.getElementById("report-submit-btn");
+  const textarea = document.getElementById("report-text");
+  const msg = document.getElementById("report-msg");
+
+  function openModal() {
+    overlay.classList.add("open");
+    msg.textContent = "";
+    msg.className = "modal-msg";
+    textarea.disabled = false;
+    submitBtn.disabled = false;
+    submitBtn.textContent = "送信";
+    textarea.focus();
+  }
+  function closeModal() {
+    overlay.classList.remove("open");
+  }
+
+  openBtn.addEventListener("click", openModal);
+  cancelBtn.addEventListener("click", closeModal);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeModal();
+  });
+
+  submitBtn.addEventListener("click", async () => {
+    const text = textarea.value.trim();
+    if (!text) {
+      msg.textContent = "内容を入力してください。";
+      msg.className = "modal-msg err";
+      return;
+    }
+    submitBtn.disabled = true;
+    textarea.disabled = true;
+    submitBtn.textContent = "送信中...";
+    msg.textContent = "";
+    msg.className = "modal-msg";
+    try {
+      const res = await fetch(REPORT_FORM_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          page: location.href,
+          sentAt: new Date().toLocaleString("ja-JP"),
+        }),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      msg.textContent = "報告ありがとうございます！送信されました。";
+      msg.className = "modal-msg ok";
+      textarea.value = "";
+      submitBtn.textContent = "送信済み";
+      setTimeout(closeModal, 1500);
+    } catch (e) {
+      msg.textContent = "送信に失敗しました。時間をおいて再度お試しください。";
+      msg.className = "modal-msg err";
+      submitBtn.disabled = false;
+      textarea.disabled = false;
+      submitBtn.textContent = "送信";
+    }
+  });
+}
+
 showRandomSubtitle();
 load();
 bumpVisitCounter();
+setupReportModal();
 </script>
 </body>
 </html>
