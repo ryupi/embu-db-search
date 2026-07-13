@@ -391,6 +391,8 @@
       font-weight: 600;
       color: var(--muted);
     }
+    /* デスクトップ表示用の中央揃え（.rank/.step）はカード表示では使わず、他の項目と揃えて左寄せにする */
+    tbody td.rank, tbody td.step { text-align: left; }
     tbody td:nth-child(1) { grid-area: taikai; }
     tbody td:nth-child(2) { grid-area: jyui; }
     tbody td:nth-child(3) { grid-area: bumon; }
