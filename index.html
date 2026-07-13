@@ -121,6 +121,75 @@
   }
   .search-btn:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
 
+  .multi-select { position: relative; }
+  .multi-select-btn {
+    padding: 7px 9px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    text-align: left;
+  }
+  .multi-select-btn span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .multi-select-btn .arrow-ico { font-size: 10px; color: var(--muted); flex-shrink: 0; }
+  .multi-select-btn:hover, .multi-select-btn.open { border-color: var(--accent); }
+  .multi-select-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 220px;
+    max-height: 260px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    z-index: 20;
+    padding: 6px;
+  }
+  .multi-select-panel.open { display: block; }
+  .multi-select-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
+    border-radius: 5px;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  .multi-select-option:hover { background: var(--accent-soft); }
+  .multi-select-option input { margin: 0; cursor: pointer; }
+  .multi-select-empty { font-size: 12px; color: var(--muted); padding: 6px; }
+  .multi-select-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 4px 6px 2px;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+  }
+  .multi-select-clear {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+  }
+  .multi-select-clear:hover { color: var(--accent); }
+
   .status-row {
     display: flex;
     justify-content: space-between;
@@ -339,8 +408,11 @@
       <select id="f-end"><option value="">すべて</option></select>
     </div>
     <div class="field">
-      <label for="f-bumon">部門</label>
-      <select id="f-bumon"><option value="">すべて</option></select>
+      <label>部門（複数選択可）</label>
+      <div class="multi-select" id="f-bumon-wrap">
+        <button type="button" class="multi-select-btn" id="f-bumon-btn"><span>すべて</span><span class="arrow-ico">▾</span></button>
+        <div class="multi-select-panel" id="f-bumon-panel"></div>
+      </div>
     </div>
     <div class="field">
       <label for="f-univ">大学</label>
@@ -598,6 +670,101 @@ const BUMON_ORDER = [
 // 構成の始まり／終わりの技が空欄の行を選べるようにするための特別な値
 const BLANK_SENTINEL = "__blank__";
 
+// 部門は複数選択できるようにする（選択中の部門名の集合）
+let bumonSelected = new Set();
+
+function updateBumonButtonLabel() {
+  const btn = document.getElementById("f-bumon-btn");
+  if (!btn) return;
+  const arrow = '<span class="arrow-ico">▾</span>';
+  if (bumonSelected.size === 0) {
+    btn.innerHTML = `<span>すべて</span>${arrow}`;
+  } else if (bumonSelected.size === 1) {
+    btn.innerHTML = `<span>${Array.from(bumonSelected)[0]}</span>${arrow}`;
+  } else {
+    btn.innerHTML = `<span>${bumonSelected.size}部門を選択中</span>${arrow}`;
+  }
+}
+
+function populateBumonOptions(values, orderList) {
+  const panel = document.getElementById("f-bumon-panel");
+  const counts = new Map();
+  values.forEach(v => {
+    if (!v || v.trim() === "") return;
+    counts.set(v, (counts.get(v) || 0) + 1);
+  });
+  // 今回の組み合わせで選べなくなった部門は選択状態から自動的に外す
+  Array.from(bumonSelected).forEach(v => { if (!counts.has(v)) bumonSelected.delete(v); });
+
+  const sorted = Array.from(counts.entries()).sort((a, b) => {
+    const ai = orderList.indexOf(a[0]);
+    const bi = orderList.indexOf(b[0]);
+    const aRank = ai === -1 ? orderList.length : ai;
+    const bRank = bi === -1 ? orderList.length : bi;
+    if (aRank !== bRank) return aRank - bRank;
+    if (b[1] !== a[1]) return b[1] - a[1];
+    return a[0].localeCompare(b[0], "ja");
+  });
+
+  panel.innerHTML = "";
+  if (sorted.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "multi-select-empty";
+    empty.textContent = "選択肢がありません";
+    panel.appendChild(empty);
+  } else {
+    sorted.forEach(([v, count]) => {
+      const label = document.createElement("label");
+      label.className = "multi-select-option";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = v;
+      cb.checked = bumonSelected.has(v);
+      cb.addEventListener("change", () => {
+        if (cb.checked) bumonSelected.add(v); else bumonSelected.delete(v);
+        updateLinkedOptions();
+      });
+      const span = document.createElement("span");
+      span.textContent = `${v} (${count})`;
+      label.appendChild(cb);
+      label.appendChild(span);
+      panel.appendChild(label);
+    });
+
+    const actions = document.createElement("div");
+    actions.className = "multi-select-actions";
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "multi-select-clear";
+    clearBtn.textContent = "選択解除";
+    clearBtn.addEventListener("click", () => {
+      bumonSelected.clear();
+      updateLinkedOptions();
+    });
+    actions.appendChild(clearBtn);
+    panel.appendChild(actions);
+  }
+
+  updateBumonButtonLabel();
+}
+
+function setupBumonDropdown() {
+  const wrap = document.getElementById("f-bumon-wrap");
+  const btn = document.getElementById("f-bumon-btn");
+  const panel = document.getElementById("f-bumon-panel");
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    panel.classList.toggle("open");
+    btn.classList.toggle("open");
+  });
+  document.addEventListener("click", (e) => {
+    if (!wrap.contains(e.target)) {
+      panel.classList.remove("open");
+      btn.classList.remove("open");
+    }
+  });
+}
+
 function populateSelect(selectEl, values, orderList, includeBlankAsOther) {
   const prev = selectEl.value;
   selectEl.innerHTML = '<option value="">すべて</option>';
@@ -644,7 +811,7 @@ function getFilters() {
   return {
     startTech: document.getElementById("f-start").value,
     endTech: document.getElementById("f-end").value,
-    bumon: document.getElementById("f-bumon").value,
+    bumon: Array.from(bumonSelected),
     univ: document.getElementById("f-univ").value,
   };
 }
@@ -656,7 +823,7 @@ function fieldMatches(val, filterVal) {
 }
 
 function rowMatches(row, f, excludeKey) {
-  if (excludeKey !== "bumon" && f.bumon && row["部門名"] !== f.bumon) return false;
+  if (excludeKey !== "bumon" && f.bumon.length && !f.bumon.includes(row["部門名"])) return false;
   if (excludeKey !== "univ" && f.univ && row["大学名"] !== f.univ) return false;
   if (excludeKey !== "startTech" && !fieldMatches(row["構成の始まりの技"], f.startTech)) return false;
   if (excludeKey !== "endTech" && !fieldMatches(row["構成の終わりの技"], f.endTech)) return false;
@@ -674,7 +841,7 @@ function updateLinkedOptions() {
   populateSelect(document.getElementById("f-end"), rowsForEnd.map(r => r["構成の終わりの技"]), null, true);
 
   const rowsForBumon = allRows.filter(r => rowMatches(r, f, "bumon"));
-  populateSelect(document.getElementById("f-bumon"), rowsForBumon.map(r => r["部門名"]), BUMON_ORDER);
+  populateBumonOptions(rowsForBumon.map(r => r["部門名"]), BUMON_ORDER);
 
   const rowsForUniv = allRows.filter(r => rowMatches(r, f, "univ"));
   populateSelect(document.getElementById("f-univ"), rowsForUniv.map(r => r["大学名"]));
@@ -801,12 +968,12 @@ function setupFilterEvents() {
     hasSearched = true;
     render();
   });
-  ["f-start", "f-end", "f-bumon", "f-univ"].forEach(id => {
+  ["f-start", "f-end", "f-univ"].forEach(id => {
     document.getElementById(id).addEventListener("change", () => {
       updateLinkedOptions();
     });
   });
-  ["f-start", "f-end", "f-bumon", "f-univ"].forEach(id => {
+  ["f-start", "f-end", "f-univ"].forEach(id => {
     document.getElementById(id).addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         hasSearched = true;
@@ -817,8 +984,8 @@ function setupFilterEvents() {
   document.getElementById("reset-btn").addEventListener("click", () => {
     document.getElementById("f-start").value = "";
     document.getElementById("f-end").value = "";
-    document.getElementById("f-bumon").value = "";
     document.getElementById("f-univ").value = "";
+    bumonSelected.clear();
     updateLinkedOptions();
     hasSearched = false;
     render();
@@ -930,6 +1097,7 @@ showRandomSubtitle();
 load();
 bumpVisitCounter();
 setupReportModal();
+setupBumonDropdown();
 </script>
 </body>
 </html>
